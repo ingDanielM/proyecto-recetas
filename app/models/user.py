@@ -3,8 +3,6 @@ from typing import List
 from sqlalchemy import String, Integer, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
-from app.models.ingredient import Ingredient
-from app.models.recipe import Recipe
 
 class User(Base):
     __tablename__ = "users"
@@ -15,6 +13,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    # Relaciones
+    # Usamos string "Ingredient" para evitar importar el archivo aquí
     ingredients: Mapped[List["Ingredient"]] = relationship("Ingredient", back_populates="owner", cascade="all, delete-orphan")
     recipes: Mapped[List["Recipe"]] = relationship("Recipe", back_populates="owner", cascade="all, delete-orphan")
+    ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="user", cascade="all, delete-orphan")

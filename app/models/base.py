@@ -3,11 +3,13 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Cargar variables de entorno
+# Intentar cargar el archivo .env
 load_dotenv()
 
-# Usamos el driver moderno psycopg (v3) configurado en el entorno
+# Intentamos leer del .env; si da None, usamos la cadena con el driver moderno explícito
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql+psycopg://recetas_user:recetas_pass@localhost:5432/chef_ia_db"
 
 # Inicialización del motor de SQLAlchemy
 engine = create_engine(
