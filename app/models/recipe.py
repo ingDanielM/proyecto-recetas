@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import String, Integer, Text, ForeignKey, DateTime, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -22,6 +22,7 @@ class Recipe(Base):
 
     # Relaciones
     owner: Mapped["User"] = relationship("User", back_populates="recipes")
+    ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="recipe", cascade="all, delete-orphan")
 
     # Restricción física en la BD para el rango de estrellas
     __table_args__ = (

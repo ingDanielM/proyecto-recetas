@@ -1,15 +1,11 @@
 from app.schemas.ingredient import IngredientBase, IngredientCreate, IngredientUpdate, IngredientResponse
-from app.schemas.recipe import RecipeBase, RecipeRate, RecipeResponse
-from app.schemas.user import UserBase, UserResponse
+from app.schemas.rating import RatingBase, RatingCreate, RatingResponse
+from app.schemas.recipe import RecipeBase, RecipeResponse
+from app.schemas.user import UserBase, UserCreate, UserResponse
 
 __all__ = [
-    "IngredientBase",
-    "IngredientCreate",
-    "IngredientUpdate",
-    "IngredientResponse",
-    "RecipeBase",
-    "RecipeRate",
-    "RecipeResponse",
-    "UserBase",
-    "UserResponse"
+    "IngredientBase", "IngredientCreate", "IngredientUpdate", "IngredientResponse",
+    "RatingBase", "RatingCreate", "RatingResponse",
+    "RecipeBase", "RecipeResponse",
+    "UserBase", "UserCreate", "UserResponse"
 ]
