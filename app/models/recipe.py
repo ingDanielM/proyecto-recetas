@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import String, Integer, Text, ForeignKey, DateTime, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+from app.models.user import User
 
 class Recipe(Base):
     __tablename__ = "recipes"

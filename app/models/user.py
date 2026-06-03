@@ -3,6 +3,8 @@ from typing import List
 from sqlalchemy import String, Integer, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+from app.models.ingredient import Ingredient
+from app.models.recipe import Recipe
 
 class User(Base):
     __tablename__ = "users"

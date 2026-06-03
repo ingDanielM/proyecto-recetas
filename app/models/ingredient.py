@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+from app.models.user import User
 
 class Ingredient(Base):
     __tablename__ = "ingredients"
