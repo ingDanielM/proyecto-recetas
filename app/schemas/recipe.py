@@ -1,6 +1,8 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.rating import RatingResponse
+
 # Campos mínimos exigidos por el profesor para la receta generada por el LLM
 class RecipeBase(BaseModel):
     nombre_plato: str = Field(..., min_length=1, max_length=150)
@@ -24,5 +26,6 @@ class RecipeResponse(BaseModel):
     rating: int | None
     user_id: int
     created_at: datetime
+    ratings: list[RatingResponse] = []  # Lista de calificaciones asociadas
 
     model_config = ConfigDict(from_attributes=True)
