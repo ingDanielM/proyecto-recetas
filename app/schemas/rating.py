@@ -2,8 +2,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
 class RatingBase(BaseModel):
-    stars: int = Field(..., ge=1, le=5, description="Calificación de 1 a 5 estrellas")
-    recipe_id: int
+    stars: int = Field(..., ge=1, le=5, description="Calificación de 1 a 5 estrellas", examples=[5])
+    recipe_id: int = Field(..., description="ID de la receta a calificar", examples=[1])
 
 class RatingCreate(RatingBase):
     pass
