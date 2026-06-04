@@ -1,0 +1,245 @@
+{% extends "layout.html" %}
+
+{% block title %}Inventario - GourmetAI{% endblock %}
+
+{% block content %}
+<div class="header-title">
+    <h1>Tu Inventario Personal</h1>
+    <p>Registra y gestiona los alimentos que tienes disponibles en tu cocina.</p>
+</div>
+
+<div class="inventory-grid">
+    <!-- Formulario para agregar / editar ingrediente -->
+    <div class="card">
+        <h2 id="formTitle" style="font-size: 1.35rem; margin-bottom: 1.5rem; color: var(--primary);">
+            <i class="fa-solid fa-circle-plus"></i> Agregar Ingrediente
+        </h2>
+        
+        <div id="formAlert" class="alert alert-danger" style="display: none;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Error al procesar ingrediente.</span>
+        </div>
+
+        <form id="ingredientForm">
+            <input type="hidden" id="ingredientId" value="">
+            
+            <div class="form-group">
+                <label class="form-label" for="nombre">Nombre del Alimento</label>
+                <input class="form-input" type="text" id="nombre" placeholder="Ej: Pollo, Papas, Cebolla" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="cantidad">Cantidad / Unidad</label>
+                <input class="form-input" type="text" id="cantidad" placeholder="Ej: 500g, 3 unidades, 1 litro" required autocomplete="off">
+            </div>
+            
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button class="btn btn-primary" type="submit" id="submitBtn" style="flex: 2;">
+                    <i class="fa-solid fa-plus"></i> Agregar
+                </button>
+                <button class="btn btn-secondary" type="button" id="cancelEditBtn" style="display: none; flex: 1;">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Listado de ingredientes actual -->
+    <div class="card" style="display: flex; flex-direction: column;">
+        <h2 style="font-size: 1.35rem; margin-bottom: 1.5rem;">
+            <i class="fa-solid fa-list-check"></i> Ingredientes Disponibles (<span id="ingredientCount">{{ ingredients|length }}</span>)
+        </h2>
+
+        <div id="emptyState" class="generator-box" style="padding: 2rem 1rem; display: {% if ingredients|length == 0 %}block{% else %}none{% endif %};">
+            <div class="generator-icon" style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-basket-shopping"></i></div>
+            <p style="font-size: 0.95rem; margin-bottom: 0;">Tu inventario está vacío. Agrega ingredientes a la izquierda para empezar.</p>
+        </div>
+
+        <div class="ingredients-list" id="ingredientsList">
+            {% for item in ingredients %}
+            <div class="ingredient-item" id="item-{{ item.id }}" data-id="{{ item.id }}" data-nombre="{{ item.nombre }}" data-cantidad="{{ item.cantidad }}">
+                <div class="ingredient-details">
+                    <h3>{{ item.nombre }}</h3>
+                    <span>{{ item.cantidad }}</span>
+                </div>
+                <div class="ingredient-actions">
+                    <button class="btn-icon edit-btn" onclick="startEdit({{ item.id }})" title="Editar ingrediente">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button class="btn-icon btn-icon-danger" onclick="deleteIngredient({{ item.id }})" title="Eliminar ingrediente">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const form = document.getElementById('ingredientForm');
+    const formTitle = document.getElementById('formTitle');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const ingredientIdInput = document.getElementById('ingredientId');
+    const nombreInput = document.getElementById('nombre');
+    const cantidadInput = document.getElementById('cantidad');
+    const formAlert = document.getElementById('formAlert');
+    const emptyState = document.getElementById('emptyState');
+    const ingredientsList = document.getElementById('ingredientsList');
+    const ingredientCount = document.getElementById('ingredientCount');
+
+    let isEditing = false;
+
+    // Manejar envío del formulario (Creación o Edición)
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        formAlert.style.display = 'none';
+
+        const nombre = nombreInput.value.trim();
+        const cantidad = cantidadInput.value.trim();
+        const ingredientId = ingredientIdInput.value;
+
+        if (isEditing) {
+            // Modo Edición: PUT /ingredients/{id}
+            try {
+                const response = await fetch(`/ingredients/${ingredientId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, cantidad })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Actualizar el DOM
+                    const itemEl = document.getElementById(`item-${ingredientId}`);
+                    itemEl.dataset.nombre = data.nombre;
+                    itemEl.dataset.cantidad = data.cantidad;
+                    itemEl.querySelector('.ingredient-details h3').textContent = data.nombre;
+                    itemEl.querySelector('.ingredient-details span').textContent = data.cantidad;
+                    
+                    resetForm();
+                } else {
+                    showError(data.detail || 'No se pudo actualizar el ingrediente.');
+                }
+            } catch (err) {
+                showError('Error de red al actualizar ingrediente.');
+            }
+        } else {
+            // Modo Creación: POST /ingredients
+            try {
+                const response = await fetch('/ingredients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, cantidad })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Agregar el nuevo ingrediente al DOM
+                    const newItemHTML = `
+                        <div class="ingredient-item" id="item-${data.id}" data-id="${data.id}" data-nombre="${data.nombre}" data-cantidad="${data.cantidad}" style="animation: fadeIn 0.3s ease-out;">
+                            <div class="ingredient-details">
+                                <h3>${data.nombre}</h3>
+                                <span>${data.cantidad}</span>
+                            </div>
+                            <div class="ingredient-actions">
+                                <button class="btn-icon edit-btn" onclick="startEdit(${data.id})" title="Editar ingrediente">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button class="btn-icon btn-icon-danger" onclick="deleteIngredient(${data.id})" title="Eliminar ingrediente">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    ingredientsList.insertAdjacentHTML('afterbegin', newItemHTML);
+                    
+                    nombreInput.value = '';
+                    cantidadInput.value = '';
+                    nombreInput.focus();
+                    
+                    updateStats();
+                } else {
+                    showError(data.detail || 'No se pudo agregar el ingrediente.');
+                }
+            } catch (err) {
+                showError('Error de red al agregar ingrediente.');
+            }
+        }
+    });
+
+    // Iniciar el modo de edición de un elemento
+    window.startEdit = (id) => {
+        const itemEl = document.getElementById(`item-${id}`);
+        const nombre = itemEl.dataset.nombre;
+        const cantidad = itemEl.dataset.cantidad;
+
+        isEditing = true;
+        ingredientIdInput.value = id;
+        nombreInput.value = nombre;
+        cantidadInput.value = cantidad;
+
+        formTitle.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Editar Ingrediente';
+        submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Cambios';
+        cancelEditBtn.style.display = 'block';
+        nombreInput.focus();
+    };
+
+    // Cancelar la edición
+    cancelEditBtn.addEventListener('click', resetForm);
+
+    function resetForm() {
+        isEditing = false;
+        ingredientIdInput.value = '';
+        nombreInput.value = '';
+        cantidadInput.value = '';
+        formTitle.innerHTML = '<i class="fa-solid fa-circle-plus"></i> Agregar Ingrediente';
+        submitBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Agregar';
+        cancelEditBtn.style.display = 'none';
+        formAlert.style.display = 'none';
+    }
+
+    // Eliminar un ingrediente del inventario
+    window.deleteIngredient = async (id) => {
+        if (!confirm('¿Estás seguro de que quieres eliminar este ingrediente?')) return;
+        
+        try {
+            const response = await fetch(`/ingredients/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.status === 204 || response.ok) {
+                const itemEl = document.getElementById(`item-${id}`);
+                itemEl.style.transform = 'scale(0.9)';
+                itemEl.style.opacity = '0';
+                setTimeout(() => {
+                    itemEl.remove();
+                    updateStats();
+                }, 300);
+            } else {
+                alert('No se pudo eliminar el ingrediente.');
+            }
+        } catch (err) {
+            alert('Error al conectar con el servidor.');
+        }
+    };
+
+    function updateStats() {
+        const count = ingredientsList.children.length;
+        ingredientCount.textContent = count;
+        if (count === 0) {
+            emptyState.style.display = 'block';
+        } else {
+            emptyState.style.display = 'none';
+        }
+    }
+
+    function showError(msg) {
+        formAlert.querySelector('span').textContent = msg;
+        formAlert.style.display = 'flex';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,311 @@
+{% extends "layout.html" %}
+
+{% block title %}Generar Recetas - GourmetAI{% endblock %}
+
+{% block content %}
+<div class="header-title">
+    <h1>Crear con Inteligencia Artificial</h1>
+    <p>La IA analizará tus ingredientes y estructurará una receta óptima para ti.</p>
+</div>
+
+<div class="card" style="min-height: 50vh; display: flex; flex-direction: column; justify-content: center;">
+    {% if not has_ingredients %}
+    <!-- Caso: Sin ingredientes en el inventario -->
+    <div class="generator-box">
+        <div class="generator-icon"><i class="fa-solid fa-circle-exclamation" style="color: var(--danger);"></i></div>
+        <h2>Inventario Vacío</h2>
+        <p>Necesitas tener al menos un ingrediente registrado en tu inventario para que el Chef de IA pueda cocinar algo.</p>
+        <div style="max-width: 250px; margin: 0 auto;">
+            <a href="/inventario" class="btn btn-primary">
+                <i class="fa-solid fa-plus"></i> Agregar Ingredientes
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <!-- Caso: Con ingredientes listos para cocinar -->
+    <div id="triggerBox" class="generator-box">
+        <div class="generator-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <h2>¿Qué cocinamos hoy?</h2>
+        <p>Haz clic en el botón de abajo para que el Chef Gourmet analice los ingredientes activos en tu inventario y redacte una receta completa.</p>
+        <div style="max-width: 280px; margin: 0 auto;">
+            <button class="btn btn-primary" id="generateBtn">
+                <i class="fa-solid fa-kitchen-set"></i> Generar Receta con IA
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pantalla de Carga Interactiva -->
+    <div id="loadingContainer" class="loading-container">
+        <div class="spinner"></div>
+        <h2 style="font-size: 1.25rem; margin-bottom: 1.5rem;">El Chef de IA está cocinando...</h2>
+        
+        <div class="loading-steps">
+            <div class="loading-step" id="step1">
+                <i class="fa-regular fa-circle-dot"></i>
+                <span>Revisando tu despensa...</span>
+            </div>
+            <div class="loading-step" id="step2">
+                <i class="fa-regular fa-circle"></i>
+                <span>Estructurando combinación culinaria...</span>
+            </div>
+            <div class="loading-step" id="step3">
+                <i class="fa-regular fa-circle"></i>
+                <span>Redactando pasos e instrucciones...</span>
+            </div>
+            <div class="loading-step" id="step4">
+                <i class="fa-regular fa-circle"></i>
+                <span>Decorando y emplatando la receta...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados de Receta Generada -->
+    <div id="recipeResult" class="recipe-result-card">
+        <div class="recipe-header">
+            <div>
+                <h2 class="recipe-title" id="resTitle">Nombre de la Receta</h2>
+                <div class="recipe-meta-tags">
+                    <span class="meta-tag tag-time"><i class="fa-regular fa-clock"></i> <span id="resTime">30 min</span></span>
+                    <span class="meta-tag tag-difficulty"><i class="fa-solid fa-chart-line"></i> <span id="resDifficulty">Fácil</span></span>
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="cookAgainBtn" style="width: auto; padding: 0.6rem 1rem;">
+                <i class="fa-solid fa-rotate-right"></i> Crear Otra
+            </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem;">
+            <!-- Ingredientes de la receta -->
+            <div>
+                <h3 class="recipe-section-title"><i class="fa-solid fa-pepper-hot"></i> Ingredientes necesarios</h3>
+                <ul class="recipe-list" id="resIngredients">
+                    <!-- Ingredientes inyectados aquí -->
+                </ul>
+            </div>
+
+            <!-- Pasos de preparación -->
+            <div>
+                <h3 class="recipe-section-title"><i class="fa-solid fa-list-ol"></i> Preparación paso a paso</h3>
+                <ol class="recipe-list steps-list" id="resSteps">
+                    <!-- Pasos inyectados aquí -->
+                </ol>
+            </div>
+        </div>
+
+        <!-- Sección de Calificación In Situ -->
+        <div style="border-top: 1px solid var(--border-color); margin-top: 2.5rem; padding-top: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h4 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 0.25rem;">¿Qué tal te pareció esta receta?</h4>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">Califica esta creación para guardarla en tu historial con tu puntuación.</p>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <input type="hidden" id="currentRecipeId" value="">
+                <div class="rating-stars" id="interactiveStars">
+                    <i class="fa-regular fa-star" data-value="1"></i>
+                    <i class="fa-regular fa-star" data-value="2"></i>
+                    <i class="fa-regular fa-star" data-value="3"></i>
+                    <i class="fa-regular fa-star" data-value="4"></i>
+                    <i class="fa-regular fa-star" data-value="5"></i>
+                </div>
+                <span id="ratingStatus" style="font-size: 0.9rem; font-weight: 500; color: var(--accent); display: none;">¡Calificada!</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const generateBtn = document.getElementById('generateBtn');
+    const triggerBox = document.getElementById('triggerBox');
+    const loadingContainer = document.getElementById('loadingContainer');
+    const recipeResult = document.getElementById('recipeResult');
+    const cookAgainBtn = document.getElementById('cookAgainBtn');
+
+    if (generateBtn) {
+        generateBtn.addEventListener('click', startGeneration);
+    }
+
+    if (cookAgainBtn) {
+        cookAgainBtn.addEventListener('click', () => {
+            recipeResult.style.display = 'none';
+            triggerBox.style.display = 'block';
+            resetRatingWidget();
+        });
+    }
+
+    async function startGeneration() {
+        triggerBox.style.display = 'none';
+        loadingContainer.style.display = 'flex';
+        recipeResult.style.display = 'none';
+
+        // Iniciar secuencia de simulación de fases de carga
+        const steps = [
+            { id: 'step1', delay: 0 },
+            { id: 'step2', delay: 1500 },
+            { id: 'step3', delay: 3500 },
+            { id: 'step4', delay: 6000 }
+        ];
+
+        // Resetear clases de pasos
+        steps.forEach(s => {
+            const el = document.getElementById(s.id);
+            el.className = 'loading-step';
+            el.querySelector('i').className = 'fa-regular fa-circle';
+        });
+
+        // Registrar timeouts para activar pasos visuales
+        const timeouts = [];
+        steps.forEach((s, idx) => {
+            const t = setTimeout(() => {
+                const el = document.getElementById(s.id);
+                el.classList.add('active');
+                el.querySelector('i').className = 'fa-regular fa-circle-dot';
+                
+                // Marcar anterior como completo
+                if (idx > 0) {
+                    const prevEl = document.getElementById(steps[idx-1].id);
+                    prevEl.classList.remove('active');
+                    prevEl.classList.add('completed');
+                    prevEl.querySelector('i').className = 'fa-solid fa-circle-check';
+                }
+            }, s.delay);
+            timeouts.push(t);
+        });
+
+        try {
+            const response = await fetch('/recipes/generate', {
+                method: 'POST'
+            });
+            const data = await response.json();
+
+            // Limpiar timeouts de simulación
+            timeouts.forEach(t => clearTimeout(t));
+
+            if (response.ok) {
+                // Completar todos los pasos en pantalla
+                steps.forEach(s => {
+                    const el = document.getElementById(s.id);
+                    el.className = 'loading-step completed';
+                    el.querySelector('i').className = 'fa-solid fa-circle-check';
+                });
+
+                // Esperar un momento corto antes de mostrar el resultado
+                setTimeout(() => {
+                    loadingContainer.style.display = 'none';
+                    showRecipe(data);
+                }, 500);
+            } else {
+                loadingContainer.style.display = 'none';
+                triggerBox.style.display = 'block';
+                alert(data.detail || 'Ocurrió un error al generar la receta.');
+            }
+        } catch (err) {
+            timeouts.forEach(t => clearTimeout(t));
+            loadingContainer.style.display = 'none';
+            triggerBox.style.display = 'block';
+            alert('Error de conexión con el servidor.');
+        }
+    }
+
+    function showRecipe(recipe) {
+        document.getElementById('currentRecipeId').value = recipe.id;
+        document.getElementById('resTitle').textContent = recipe.nombre_plato;
+        document.getElementById('resTime').textContent = recipe.tiempo_estimado;
+        document.getElementById('resDifficulty').textContent = recipe.nivel_dificultad;
+
+        // Limpiar y poblar ingredientes
+        const ingredientsEl = document.getElementById('resIngredients');
+        ingredientsEl.innerHTML = '';
+        recipe.ingredientes.forEach(ing => {
+            const li = document.createElement('li');
+            li.textContent = ing;
+            ingredientsEl.appendChild(li);
+        });
+
+        // Limpiar y poblar pasos
+        const stepsEl = document.getElementById('resSteps');
+        stepsEl.innerHTML = '';
+        recipe.pasos.forEach(paso => {
+            const li = document.createElement('li');
+            li.textContent = paso;
+            stepsEl.appendChild(li);
+        });
+
+        recipeResult.style.display = 'block';
+        recipeResult.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Configurar el widget interactivo de estrellas
+    const starsContainer = document.getElementById('interactiveStars');
+    const stars = starsContainer.querySelectorAll('i');
+    const ratingStatus = document.getElementById('ratingStatus');
+
+    stars.forEach(star => {
+        star.addEventListener('mouseover', () => {
+            const val = parseInt(star.dataset.value);
+            highlightStars(val);
+        });
+
+        star.addEventListener('mouseleave', () => {
+            const activeStar = starsContainer.querySelector('.fa-star.fa-solid');
+            // Si ya hay una calificación guardada, mantenerla iluminada
+            const val = activeStar ? parseInt(activeStar.dataset.value) : 0;
+            highlightStars(val);
+        });
+
+        star.addEventListener('click', async () => {
+            const val = parseInt(star.dataset.value);
+            const recipeId = document.getElementById('currentRecipeId').value;
+            
+            try {
+                const response = await fetch(`/recipes/${recipeId}/rate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rating: val })
+                });
+
+                if (response.ok) {
+                    setSavedRating(val);
+                    ratingStatus.style.display = 'block';
+                } else {
+                    alert('No se pudo guardar la calificación.');
+                }
+            } catch (err) {
+                alert('Error al calificar la receta.');
+            }
+        });
+    });
+
+    function highlightStars(count) {
+        stars.forEach(s => {
+            const val = parseInt(s.dataset.value);
+            if (val <= count) {
+                s.className = 'fa-solid fa-star';
+            } else {
+                s.className = 'fa-regular fa-star';
+            }
+        });
+    }
+
+    function setSavedRating(count) {
+        stars.forEach(s => {
+            const val = parseInt(s.dataset.value);
+            if (val <= count) {
+                s.className = 'fa-solid fa-star active';
+            } else {
+                s.className = 'fa-regular fa-star';
+            }
+        });
+    }
+
+    function resetRatingWidget() {
+        stars.forEach(s => {
+            s.className = 'fa-regular fa-star';
+        });
+        ratingStatus.style.display = 'none';
+    }
+</script>
+{% endblock %}
