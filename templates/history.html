@@ -1,0 +1,241 @@
+{% extends "layout.html" %}
+
+{% block title %}Historial de Recetas - GourmetAI{% endblock %}
+
+{% block content %}
+<div class="header-title">
+    <h1>Historial de Recetas</h1>
+    <p>Revisa tus creaciones pasadas, modifícales la calificación o elimínalas de tu historial.</p>
+</div>
+
+{% if recipes|length == 0 %}
+<div class="card" style="min-height: 40vh; display: flex; align-items: center; justify-content: center;">
+    <div class="generator-box" style="padding: 2rem 1rem;">
+        <div class="generator-icon" style="font-size: 3rem; margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <h2>Sin Recetas Generadas</h2>
+        <p>Aún no has generado ninguna receta con el Chef de IA. Ve a la sección de Generar Receta para empezar.</p>
+        <div style="max-width: 250px; margin: 1.5rem auto 0;">
+            <a href="/recipes" class="btn btn-primary">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generar una Receta
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="history-grid" id="historyGrid">
+    {% for recipe in recipes %}
+    <div class="card recipe-card" id="recipe-{{ recipe.id }}" 
+         data-id="{{ recipe.id }}" 
+         data-nombre="{{ recipe.nombre_plato }}" 
+         data-tiempo="{{ recipe.tiempo_estimado }}" 
+         data-dificultad="{{ recipe.nivel_dificultad }}"
+         data-ingredientes='{{ recipe.ingredientes | tojson | safe }}'
+         data-pasos='{{ recipe.pasos | tojson | safe }}'
+         data-rating="{{ recipe.rating or 0 }}">
+        
+        <div class="recipe-card-header">
+            <h3 class="recipe-card-title">{{ recipe.nombre_plato }}</h3>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);"><i class="fa-regular fa-calendar-days"></i> {{ recipe.created_at }}</span>
+        </div>
+
+        <div class="recipe-card-body">
+            <p class="recipe-card-preview">
+                <strong>Ingredientes principales:</strong> {{ recipe.ingredientes | join(', ') }}
+            </p>
+            <div class="recipe-meta-tags">
+                <span class="meta-tag tag-time"><i class="fa-regular fa-clock"></i> {{ recipe.tiempo_estimado }}</span>
+                <span class="meta-tag tag-difficulty"><i class="fa-solid fa-chart-line"></i> {{ recipe.nivel_dificultad }}</span>
+            </div>
+        </div>
+
+        <div class="recipe-card-footer">
+            <!-- Calificación interactiva -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Calificación</span>
+                <div class="rating-stars" data-recipe-id="{{ recipe.id }}" data-rating-val="{{ recipe.rating or 0 }}">
+                    {% for i in range(1, 6) %}
+                    <i class="{% if recipe.rating and i <= recipe.rating %}fa-solid{% else %}fa-regular{% endif %} fa-star" data-val="{{ i }}"></i>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary" onclick="openDetailsModal({{ recipe.id }})" style="padding: 0.5rem 0.85rem; font-size: 0.85rem; width: auto;">
+                    <i class="fa-solid fa-eye"></i> Ver
+                </button>
+                <button class="btn-icon btn-icon-danger" onclick="deleteRecipe({{ recipe.id }})" title="Eliminar del historial">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Modal para ver el Detalle de la Receta -->
+<div class="modal" id="recipeModal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        
+        <div class="recipe-header">
+            <div>
+                <h2 class="recipe-title" id="modalTitle">Nombre de la Receta</h2>
+                <div class="recipe-meta-tags">
+                    <span class="meta-tag tag-time"><i class="fa-regular fa-clock"></i> <span id="modalTime">30 min</span></span>
+                    <span class="meta-tag tag-difficulty"><i class="fa-solid fa-chart-line"></i> <span id="modalDifficulty">Fácil</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 2rem; margin-top: 1.5rem;">
+            <!-- Ingredientes -->
+            <div>
+                <h3 class="recipe-section-title"><i class="fa-solid fa-pepper-hot"></i> Ingredientes necesarios</h3>
+                <ul class="recipe-list" id="modalIngredients">
+                    <!-- Dinámico -->
+                </ul>
+            </div>
+
+            <!-- Pasos -->
+            <div>
+                <h3 class="recipe-section-title"><i class="fa-solid fa-list-ol"></i> Preparación paso a paso</h3>
+                <ol class="recipe-list steps-list" id="modalSteps">
+                    <!-- Dinámico -->
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Inicializar listeners de estrellas en todo el historial
+    document.querySelectorAll('.rating-stars').forEach(container => {
+        const recipeId = container.dataset.recipeId;
+        const stars = container.querySelectorAll('i');
+
+        stars.forEach(star => {
+            // Efecto Hover
+            star.addEventListener('mouseover', () => {
+                const val = parseInt(star.dataset.val);
+                highlightStars(stars, val);
+            });
+
+            star.addEventListener('mouseleave', () => {
+                const val = parseInt(container.dataset.ratingVal);
+                highlightStars(stars, val);
+            });
+
+            // Enviar calificación
+            star.addEventListener('click', async () => {
+                const val = parseInt(star.dataset.val);
+                
+                try {
+                    const response = await fetch(`/recipes/${recipeId}/rate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rating: val })
+                    });
+
+                    if (response.ok) {
+                        container.dataset.ratingVal = val;
+                        highlightStars(stars, val, true);
+                    } else {
+                        alert('No se pudo guardar la calificación.');
+                    }
+                } catch (err) {
+                    alert('Error al calificar la receta.');
+                }
+            });
+        });
+    });
+
+    function highlightStars(starsList, count, persist = false) {
+        starsList.forEach(s => {
+            const val = parseInt(s.dataset.val);
+            if (val <= count) {
+                s.className = 'fa-solid fa-star' + (persist ? ' active' : '');
+            } else {
+                s.className = 'fa-regular fa-star';
+            }
+        });
+    }
+
+    // Lógica del Modal de Detalle
+    const modal = document.getElementById('recipeModal');
+    
+    window.openDetailsModal = (id) => {
+        const cardEl = document.getElementById(`recipe-${id}`);
+        const nombre = cardEl.dataset.nombre;
+        const tiempo = cardEl.dataset.tiempo;
+        const dificultad = cardEl.dataset.dificultad;
+        const ingredientes = JSON.parse(cardEl.dataset.ingredientes);
+        const pasos = JSON.parse(cardEl.dataset.pasos);
+
+        document.getElementById('modalTitle').textContent = nombre;
+        document.getElementById('modalTime').textContent = tiempo;
+        document.getElementById('modalDifficulty').textContent = dificultad;
+
+        // Cargar ingredientes
+        const ingEl = document.getElementById('modalIngredients');
+        ingEl.innerHTML = '';
+        ingredientes.forEach(ing => {
+            const li = document.createElement('li');
+            li.textContent = ing;
+            ingEl.appendChild(li);
+        });
+
+        // Cargar pasos
+        const pasosEl = document.getElementById('modalSteps');
+        pasosEl.innerHTML = '';
+        pasos.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p;
+            pasosEl.appendChild(li);
+        });
+
+        modal.style.display = 'flex';
+    };
+
+    window.closeModal = () => {
+        modal.style.display = 'none';
+    };
+
+    // Cerrar modal al hacer clic fuera del contenido
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    // Eliminar una receta del historial
+    window.deleteRecipe = async (id) => {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta receta de tu historial?')) return;
+
+        try {
+            const response = await fetch(`/recipes/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.status === 204 || response.ok) {
+                const cardEl = document.getElementById(`recipe-${id}`);
+                cardEl.style.transform = 'scale(0.9)';
+                cardEl.style.opacity = '0';
+                setTimeout(() => {
+                    cardEl.remove();
+                    if (document.getElementById('historyGrid').children.length === 0) {
+                        window.location.reload();
+                    }
+                }, 300);
+            } else {
+                alert('No se pudo eliminar la receta.');
+            }
+        } catch (err) {
+            alert('Error al conectar con el servidor.');
+        }
+    };
+</script>
+{% endblock %}

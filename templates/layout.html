@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Generador de Recetas Inteligente{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Estilos de la aplicación -->
+    <link rel="stylesheet" href="/static/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if user %}
+    <!-- Barra Lateral (Sidebar) para Usuarios Autenticados -->
+    <aside class="sidebar">
+        <div class="brand">
+            <i class="fa-solid fa-utensils"></i>
+            <span>GourmetAI</span>
+        </div>
+        
+        <ul class="nav-links">
+            <li class="nav-item {% if active_tab == 'inventario' %}active{% endif %}">
+                <a href="/inventario">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span>Inventario</span>
+                </a>
+            </li>
+            <li class="nav-item {% if active_tab == 'recipes' %}active{% endif %}">
+                <a href="/recipes">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Generar Receta</span>
+                </a>
+            </li>
+            <li class="nav-item {% if active_tab == 'history' %}active{% endif %}">
+                <a href="/history">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historial</span>
+                </a>
+            </li>
+        </ul>
+        
+        <div class="user-profile">
+            <div class="avatar">
+                {{ user.username[0] | upper }}
+            </div>
+            <div class="user-info">
+                <span class="username">{{ user.username }}</span>
+                <span style="font-size: 0.75rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; max-width: 140px;">
+                    {{ user.email }}
+                </span>
+            </div>
+            <a href="/logout" class="logout-btn" title="Cerrar Sesión">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    {% else %}
+    <!-- Envoltura de Autenticación para Login / Registro -->
+    <div class="auth-wrapper">
+        {% block auth_content %}{% endblock %}
+    </div>
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

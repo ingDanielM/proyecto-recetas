@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Iniciar Sesión - GourmetAI{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <h2>Bienvenido a GourmetAI</h2>
+        <p>Inicia sesión para gestionar tus ingredientes y crear recetas con Inteligencia Artificial</p>
+    </div>
+
+    <!-- Alert Box para errores -->
+    <div id="alertBox" class="alert alert-danger" style="display: none;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Nombre de usuario o contraseña incorrectos.</span>
+    </div>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label class="form-label" for="username">Usuario o Correo Electrónico</label>
+            <input class="form-input" type="text" id="username" name="username" placeholder="juan_perez" required autocomplete="username">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="password">Contraseña</label>
+            <input class="form-input" type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        
+        <button class="btn btn-primary" type="submit" style="margin-top: 1rem;">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            Ingresar
+        </button>
+    </form>
+
+    <div class="auth-footer">
+        ¿No tienes cuenta? <a href="/register">Regístrate aquí</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const alertBox = document.getElementById('alertBox');
+        alertBox.style.display = 'none';
+
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Redirigir al inventario
+                window.location.href = '/inventario';
+            } else {
+                // Mostrar error
+                alertBox.querySelector('span').textContent = data.detail || 'Credenciales inválidas.';
+                alertBox.style.display = 'flex';
+            }
+        } catch (err) {
+            alertBox.querySelector('span').textContent = 'Error al conectar con el servidor.';
+            alertBox.style.display = 'flex';
+        }
+    });
+</script>
+{% endblock %}

@@ -22,27 +22,18 @@ class LLMService:
             "X-Title": "Generador de Recetas Inteligente"
         }
 
-    async def generar_receta(self, ingredientes_usuario: list[str]) -> dict:
+    def construir_prompt(self, ingredientes_usuario: list[str]) -> tuple[str, str]:
         """
-        Construye el prompt con los ingredientes del usuario, envía la solicitud a OpenRouter,
-        recibe la respuesta y parsea el JSON con los campos estrictos requeridos por el profesor.
+        Construye el prompt del sistema y de usuario a partir de los ingredientes disponibles.
         """
-        if not self.api_key or self.api_key.startswith("sk-or-..."):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="La API Key de OpenRouter no está configurada correctamente en el archivo .env."
-            )
-
         if not ingredientes_usuario:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No tienes ingredientes suficientes en tu inventario para generar una receta."
             )
 
-        # 1. Construir la lista de ingredientes en texto plano para el prompt
         ingredientes_texto = ", ".join(ingredientes_usuario)
 
-        # 2. Definir las instrucciones del sistema con la estructura exacta exigida por el profesor
         system_instruction = (
             "Eres un chef experto y un backend útil que responde exclusivamente en formato JSON estructurado.\n"
             "Tu tarea es generar una receta creativa utilizando de manera prioritaria los ingredientes proporcionados por el usuario.\n"
@@ -54,12 +45,51 @@ class LLMService:
             '  "nombre_plato": "Nombre creativo de la receta",\n'
             '  "ingredientes": ["Lista de strings con los ingredientes y sus cantidades usadas"],\n'
             '  "pasos": ["Lista de strings detallando el paso a paso ordenado cronológicamente"],\n'
-            '  "tiempo_estimated": "Ej: 35 minutos",\n'
+            '  "tiempo_estimado": "Ej: 35 minutos",\n'
             '  "nivel_dificultad": "Ej: Fácil, Intermedio o Difícil"\n'
             "}"
         )
 
         user_content = f"Mis ingredientes disponibles son: {ingredientes_texto}. Genérame una receta óptima."
+        return system_instruction, user_content
+
+    def parsear_receta(self, content_text: str) -> dict:
+        """
+        Parsea el texto JSON devuelto por el LLM y valida/rellena las llaves obligatorias.
+        """
+        try:
+            receta_parseada = json.loads(content_text.strip())
+        except (json.JSONDecodeError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La IA no devolvió un formato JSON válido que cumpla con los requisitos estructurados."
+            )
+
+        # Validar de forma preventiva que traiga los campos mínimos exigidos antes de retornar
+        campos_obligatorios = ["nombre_plato", "ingredientes", "pasos", "tiempo_estimado", "nivel_dificultad"]
+        for campo in campos_obligatorios:
+            if campo not in receta_parseada:
+                # Si falta una llave, la creamos vacía o con tipo correcto para evitar caídas
+                if campo in ["ingredientes", "pasos"]:
+                    receta_parseada[campo] = []
+                else:
+                    receta_parseada[campo] = ""
+
+        return receta_parseada
+
+    async def generar_receta(self, ingredientes_usuario: list[str]) -> dict:
+        """
+        Construye el prompt con los ingredientes del usuario, envía la solicitud a OpenRouter,
+        recibe la respuesta y parsea el JSON con los campos estrictos requeridos por el profesor.
+        """
+        if not self.api_key or self.api_key.startswith("sk-or-..."):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="La API Key de OpenRouter no está configurada correctamente en el archivo .env."
+            )
+
+        # 1 y 2. Construir e inicializar el prompt
+        system_instruction, user_content = self.construir_prompt(ingredientes_usuario)
 
         # Cuerpo de la petición (incluyendo la directiva response_format para forzar JSON)
         payload = {
@@ -93,27 +123,14 @@ class LLMService:
                 content_text = result_json["choices"][0]["message"]["content"].strip()
                 
                 # 5. Parsear el JSON
-                receta_parseada = json.loads(content_text)
-                
-                # Validar de forma preventiva que traiga los campos mínimos exigidos antes de retornar
-                campos_obligatorios = ["nombre_plato", "ingredientes", "pasos", "tiempo_estimado", "nivel_dificultad"]
-                for campo in campos_obligatorios:
-                    if campo not in receta_parseada:
-                        # Si falta una llave, la creamos vacía para evitar caídas en el guardado de la BD
-                        receta_parseada[campo] = "" if "lista" not in campo else []
-                
-                return receta_parseada
+                return self.parsear_receta(content_text)
 
             except httpx.RequestError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"No se pudo establecer comunicación con OpenRouter: {exc}"
                 )
-            except (json.JSONDecodeError, KeyError, IndexError):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="La IA no devolvió un formato JSON válido que cumpla con los requisitos estructurados."
-                )
+
 
 # Instancia única del servicio para ser reutilizada (patrón Singleton)
 llm_service = LLMService()

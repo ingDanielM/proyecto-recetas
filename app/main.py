@@ -2,8 +2,9 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.models import Base, engine
-from app.routers import ingredients_router, recipes_router
+from app.routers import ingredients_router, recipes_router, auth_router, frontend_router
 
 # Configuración básica de logs para monitorear errores en la consola del servidor
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,9 @@ app = FastAPI(
     description="API para generar recetas con IA a partir de tu inventario (Integración OpenRouter)",
     version="1.0.0"
 )
+
+# Configurar carpeta de archivos estáticos
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Configuración de CORS (Útil si conectas tu frontend en React más adelante)
 app.add_middleware(
@@ -49,8 +53,10 @@ def global_exception_handler(request: Request, exc: Exception):
     )
 
 # --- INCLUSIÓN DE ROUTERS ---
+app.include_router(auth_router)
 app.include_router(ingredients_router)
 app.include_router(recipes_router)
+app.include_router(frontend_router)
 
 # --- ENDPOINTS CORE ---
 
