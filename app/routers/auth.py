@@ -10,6 +10,7 @@ import bcrypt
 
 from app.models import get_db, User
 from app.schemas import UserCreate, UserResponse
+from app.routers.auth_deps import get_current_user
 
 # Leer configuración de JWT del entorno
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey123")
@@ -128,3 +129,12 @@ def logout(response: Response):
     """
     response.delete_cookie("access_token")
     return {"status": "ok", "message": "Sesión cerrada correctamente"}
+
+@router.get("/me", response_model=UserResponse)
+def get_me(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Retorna la información del usuario autenticado.
+    """
+    return current_user
