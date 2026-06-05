@@ -197,3 +197,8 @@ def test_generate_recipe_endpoint(mock_generar, client, auth_headers, db, test_u
     recetas_db = db.query(Recipe).filter(Recipe.user_id == test_user.id).all()
     assert len(recetas_db) == 1
     assert recetas_db[0].nombre_plato == "Papas Fritas Gourmet"
+    
+    # prueba de éxito para auth/me
+    def test_get_me_success(client, auth_headers):
+    response = client.get("/auth/me", headers=auth_headers)
+    assert response.status_code == 200
