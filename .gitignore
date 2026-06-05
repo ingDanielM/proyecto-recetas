@@ -10,3 +10,4 @@ venv/
 alembic
 recipes.db
 *.db
+entorno/

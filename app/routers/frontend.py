@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Request, Depends, status, HTTPException
+# app/routers/frontend.py
+from fastapi import APIRouter, Request, Depends, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-import json
 
 from app.models import get_db, Ingredient, Recipe
-from app.routers.auth_deps import get_current_user
 
 router = APIRouter(tags=["Frontend"])
 templates = Jinja2Templates(directory="templates")
 
-# Helper para chequear el usuario de manera silenciosa (sin lanzar 401 HTTP al cliente si es una página)
 def get_user_or_none(request: Request, db: Session) -> bool:
     try:
         from app.routers.auth_deps import get_current_user
@@ -46,7 +44,6 @@ def inventario_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     
-    # Obtener ingredientes del usuario
     ingredients = db.query(Ingredient).filter(Ingredient.user_id == user.id).all()
     return templates.TemplateResponse(
         "inventario.html", 
@@ -59,9 +56,11 @@ def recipes_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     
-    # Validar si tiene ingredientes
+    # Validar si tiene ingredientes en su inventario
     ingredients = db.query(Ingredient).filter(Ingredient.user_id == user.id).all()
     has_ingredients = len(ingredients) > 0
+    
+    # CRÍTICO: Se pasa "user": user para que layout.html sepa que está autenticado
     return templates.TemplateResponse(
         "recipes.html", 
         {"request": request, "user": user, "has_ingredients": has_ingredients, "active_tab": "recipes"}
@@ -73,12 +72,11 @@ def history_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     
-    # Obtener historial de recetas
     recipes = db.query(Recipe).filter(Recipe.user_id == user.id).order_by(Recipe.created_at.desc()).all()
     
-    # Formatear JSON string a listas para Jinja2
     formatted_recipes = []
     for r in recipes:
+        import json
         try:
             ing_list = json.loads(r.ingredientes)
         except Exception:

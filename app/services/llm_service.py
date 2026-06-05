@@ -1,3 +1,4 @@
+# app/services/llm_service.py
 import os
 import json
 import httpx
@@ -12,13 +13,15 @@ class LLMService:
         # Leer variables de entorno con valores por defecto seguros
         self.api_key = os.getenv("OPENROUTER_API_KEY", "")
         self.api_url = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
-        self.model = os.getenv("LLM_MODEL", "mistralai/mistral-7b-instruct:free")
+        
+        # Mantenemos el modelo comercial ultraestable y económico
+        self.model = os.getenv("LLM_MODEL", "google/gemini-2.5-flash")
         
         # Cabeceras obligatorias requeridas por OpenRouter
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://localhost:8000",
+            "HTTP-Referer": "http://localhost:8000",
             "X-Title": "Generador de Recetas Inteligente"
         }
 
@@ -57,8 +60,14 @@ class LLMService:
         """
         Parsea el texto JSON devuelto por el LLM y valida/rellena las llaves obligatorias.
         """
+        content_text = content_text.strip()
+        
+        # Limpieza de seguridad: Si el modelo mete bloques de código markdown, los removemos
+        if content_text.startswith("```"):
+            content_text = content_text.strip("```json").strip("```").strip()
+            
         try:
-            receta_parseada = json.loads(content_text.strip())
+            receta_parseada = json.loads(content_text)
         except (json.JSONDecodeError, TypeError):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -69,18 +78,17 @@ class LLMService:
         campos_obligatorios = ["nombre_plato", "ingredientes", "pasos", "tiempo_estimado", "nivel_dificultad"]
         for campo in campos_obligatorios:
             if campo not in receta_parseada:
-                # Si falta una llave, la creamos vacía o con tipo correcto para evitar caídas
                 if campo in ["ingredientes", "pasos"]:
                     receta_parseada[campo] = []
                 else:
-                    receta_parseada[campo] = ""
+                    receta_parseada[campo] = "No especificado"
 
         return receta_parseada
 
     async def generar_receta(self, ingredientes_usuario: list[str]) -> dict:
         """
         Construye el prompt con los ingredientes del usuario, envía la solicitud a OpenRouter,
-        recibe la respuesta y parsea el JSON con los campos estrictos requeridos por el profesor.
+        recepciona la respuesta y parsea el JSON con los campos estrictos requeridos por el profesor.
         """
         if not self.api_key or self.api_key.startswith("sk-or-..."):
             raise HTTPException(
@@ -91,7 +99,7 @@ class LLMService:
         # 1 y 2. Construir e inicializar el prompt
         system_instruction, user_content = self.construir_prompt(ingredientes_usuario)
 
-        # Cuerpo de la petición (incluyendo la directiva response_format para forzar JSON)
+        # Cuerpo de la petición
         payload = {
             "model": self.model,
             "messages": [
@@ -99,7 +107,10 @@ class LLMService:
                 {"role": "user", "content": user_content}
             ],
             "response_format": {"type": "json_object"},
-            "temperature": 0.7
+            "temperature": 0.7,
+            # CORREGIDO: Limitamos los tokens de salida de forma estricta.
+            # Una receta de cocina rara vez supera los 500-700 tokens, así que 1500 es más que suficiente y seguro.
+            "max_tokens": 1500
         }
 
         # 3. Enviar solicitud de forma asíncrona a OpenRouter
@@ -109,18 +120,25 @@ class LLMService:
                     self.api_url,
                     headers=self.headers,
                     json=payload,
-                    timeout=30.0
+                    timeout=45.0
                 )
                 
                 if response.status_code != 200:
                     raise HTTPException(
                         status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f"Error en el servicio de IA (OpenRouter). Código de estado: {response.status_code}"
+                        detail=f"Error en el servicio de IA (OpenRouter). Código de estado: {response.status_code}. Detalle: {response.text}"
                     )
                 
                 # 4. Recibir respuesta externa
                 result_json = response.json()
-                content_text = result_json["choices"][0]["message"]["content"].strip()
+                
+                if "choices" not in result_json or len(result_json["choices"]) == 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="La respuesta de OpenRouter no contiene opciones ('choices') válidas."
+                    )
+                    
+                content_text = result_json["choices"][0]["message"]["content"]
                 
                 # 5. Parsear el JSON
                 return self.parsear_receta(content_text)
@@ -132,5 +150,4 @@ class LLMService:
                 )
 
 
-# Instancia única del servicio para ser reutilizada (patrón Singleton)
 llm_service = LLMService()
