@@ -10,7 +10,6 @@
 
 <div class="card" style="min-height: 50vh; display: flex; flex-direction: column; justify-content: center;">
     {% if not has_ingredients %}
-    <!-- Caso: Sin ingredientes en el inventario -->
     <div class="generator-box">
         <div class="generator-icon"><i class="fa-solid fa-circle-exclamation" style="color: var(--danger);"></i></div>
         <h2>Inventario Vacío</h2>
@@ -22,7 +21,6 @@
         </div>
     </div>
     {% else %}
-    <!-- Caso: Con ingredientes listos para cocinar -->
     <div id="triggerBox" class="generator-box">
         <div class="generator-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
         <h2>¿Qué cocinamos hoy?</h2>
@@ -35,7 +33,6 @@
     </div>
     {% endif %}
 
-    <!-- Pantalla de Carga Interactiva -->
     <div id="loadingContainer" class="loading-container">
         <div class="spinner"></div>
         <h2 style="font-size: 1.25rem; margin-bottom: 1.5rem;">El Chef de IA está cocinando...</h2>
@@ -60,7 +57,6 @@
         </div>
     </div>
 
-    <!-- Resultados de Receta Generada -->
     <div id="recipeResult" class="recipe-result-card">
         <div class="recipe-header">
             <div>
@@ -76,24 +72,19 @@
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem;">
-            <!-- Ingredientes de la receta -->
             <div>
                 <h3 class="recipe-section-title"><i class="fa-solid fa-pepper-hot"></i> Ingredientes necesarios</h3>
                 <ul class="recipe-list" id="resIngredients">
-                    <!-- Ingredientes inyectados aquí -->
-                </ul>
+                    </ul>
             </div>
 
-            <!-- Pasos de preparación -->
             <div>
                 <h3 class="recipe-section-title"><i class="fa-solid fa-list-ol"></i> Preparación paso a paso</h3>
                 <ol class="recipe-list steps-list" id="resSteps">
-                    <!-- Pasos inyectados aquí -->
-                </ol>
+                    </ol>
             </div>
         </div>
 
-        <!-- Sección de Calificación In Situ -->
         <div style="border-top: 1px solid var(--border-color); margin-top: 2.5rem; padding-top: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
             <div>
                 <h4 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 0.25rem;">¿Qué tal te pareció esta receta?</h4>
@@ -176,7 +167,8 @@
         });
 
         try {
-            const response = await fetch('/recipes/generate', {
+            // CORREGIDO: Apunta al nuevo prefijo unificado /api/recipes/generate
+            const response = await fetch('/api/recipes/generate', {
                 method: 'POST'
             });
             const data = await response.json();
@@ -261,7 +253,8 @@
             const recipeId = document.getElementById('currentRecipeId').value;
             
             try {
-                const response = await fetch(`/recipes/${recipeId}/rate`, {
+                // CORREGIDO: Apunta al prefijo /api/recipes/{id}/rate para conectar con tu router de datos
+                const response = await fetch(`/api/recipes/${recipeId}/rate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ rating: val })
